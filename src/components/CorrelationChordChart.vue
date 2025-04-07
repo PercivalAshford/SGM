@@ -1,6 +1,6 @@
 <template>
     <div class="chart-container">
-      <h2>科目与总分的相关性分析</h2>
+      
       <p class="description">通过弦图展示各科目与总分的关系</p>
   
       <div v-if="loading" class="loading">数据加载中...</div>
@@ -88,7 +88,7 @@
   
           chartOption.value = {
             title: {
-              text: "科目与总分的相关性分析",
+              text: "",
               left: "center",
               textStyle: { fontSize: 20, fontWeight: "bold" },
             },

@@ -1,6 +1,5 @@
 <template>
   <div class="chart-container">
-    <h2>班级各科目成绩分布（箱型图）</h2>
     <p class="description">查看班级各科目成绩的离散程度及异常值</p>
 
     <div v-if="loading" class="loading">数据加载中...</div>
@@ -61,7 +60,7 @@ export default {
 
         // 配置 ECharts 图表
         chartOption.value = {
-          title: { text: "班级各科目成绩分布（箱型图）", left: "center" },
+          title: { text: "", left: "center" },
           tooltip: { trigger: "item", formatter: (param) => {
               return `${param.seriesName} <br/> 最低值: ${param.data[0]} <br/> Q1: ${param.data[1]} <br/> 中位数: ${param.data[2]} <br/> Q3: ${param.data[3]} <br/> 最高值: ${param.data[4]}`;
             } 

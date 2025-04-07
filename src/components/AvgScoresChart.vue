@@ -1,6 +1,5 @@
 <template>
     <div class="chart-container">
-      <h2>班级各科目平均分变化趋势</h2>
       <v-chart class="chart" :option="chartOption" autoresize />
     </div>
   </template>

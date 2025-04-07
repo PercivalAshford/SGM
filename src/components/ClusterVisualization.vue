@@ -1,6 +1,6 @@
 <template>
   <div class="chart-container">
-    <h2>学生成绩聚类分析</h2>
+    
     <p class="description">选择考试批次和科目组合，查看学生成绩的聚类情况</p>
 
     <!-- 选择考试批次 -->

@@ -31,8 +31,22 @@
       <button @click="exportToExcel" class="export-btn">
         <span>导出 Excel</span>
       </button>
-    </div>
 
+        <!-- ✅ 新增：修改成绩按钮 -->
+      <button @click="openEditModal" class="edit-score-btn">
+        <span>修改成绩</span>
+      </button>
+      <EditScoreModal
+  :visible="editModalVisible"
+  :subjects="subjects"
+  :subjectMap="subjectMap"
+  :examDate="selectedExamId"
+  :initialData="{}"
+  @submit="handleEditSubmit"
+  @close="editModalVisible = false"
+/>
+    </div>
+    
     <!-- 成绩表格 -->
     <div class="table-wrapper">
       <table v-if="grades.length">
@@ -48,7 +62,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="student in sortedGrades" :key="student.name">
+          <tr v-for="student in sortedGrades" :key="student.id || student.name">
             <td>{{ student.name }}</td>
             <td v-for="subject in subjects" 
     :key="subject" 
@@ -65,12 +79,16 @@
 </template>
 
 <script>
+import EditScoreModal from '@/components/EditScoreModal.vue';
 import axios from "axios";
 import { ref, computed, onMounted, watch } from "vue";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
 export default {
+  components: {
+    EditScoreModal
+  },
   setup() {
     const exams = ref([]);
     const selectedExamId = ref("");
@@ -80,6 +98,7 @@ export default {
     const sortOrder = ref(1);
     const loading = ref(false);
     const tooltip = ref({ visible: false, text: "", style: {} });
+    const editModalVisible = ref(false);
 
     const subjects = ["chinese", "math", "english", "physics", "chemistry", "biology"];
     const subjectMap = {
@@ -90,7 +109,18 @@ export default {
       chemistry: "化学",
       biology: "生物",
     };
-
+    const openEditModal = () => {
+  editModalVisible.value = true;
+};
+const handleEditSubmit = async (formData) => {
+  try {
+    await axios.post('http://localhost:3000/api/update-grade', formData);
+    editModalVisible.value = false;
+    await fetchGrades(); // 刷新数据
+  } catch (err) {
+    console.error('提交失败', err);
+  }
+};
     const fetchExams = async () => {
       try {
         const response = await axios.get("http://localhost:3000/api/exams");
@@ -176,13 +206,38 @@ const hideTooltip = () => {
       subjectMap,
       tooltip,
       showTooltip,
-      hideTooltip
+      hideTooltip,
+      editModalVisible,
+      openEditModal,
+      handleEditSubmit,
+      
     };
   },
 };
 </script>
 
 <style scoped>
+.edit-score-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706); /* 橙色风格 */
+  color: white;
+  border: none;
+  font-size: 16px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  transition: 0.3s ease-in-out;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.edit-score-btn:hover {
+  background: linear-gradient(135deg, #fbbf24, #b45309);
+  transform: scale(1.08);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+}
+
+.edit-score-btn:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
 .grades-container {
   max-width: 900px;
   margin: auto;
@@ -386,5 +441,9 @@ th {
   font-size: 14px;
   pointer-events: none;
   transition: opacity 0.2s ease-in-out;
+}
+.modal {
+  transition: transform 0.3s ease;
+  transform: scale(1);
 }
 </style>

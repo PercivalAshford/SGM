@@ -1,6 +1,5 @@
 <template>
     <div class="chart-container">
-      <h2>学生进步 vs 退步趋势</h2>
       <p class="description">展示学生在历次考试中的进步与退步趋势</p>
     
       <div class="chart-wrapper">
@@ -69,7 +68,7 @@
           ];
   
           chartOption.value = {
-            title: { text: "进步 vs 退步趋势", left: "center", textStyle: { fontSize: 18, fontWeight: "bold" } },
+            title: { text: "", left: "center", textStyle: { fontSize: 18, fontWeight: "bold" } },
             tooltip: {
               trigger: "axis",
               axisPointer: { type: "cross" },

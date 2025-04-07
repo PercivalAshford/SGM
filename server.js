@@ -529,4 +529,230 @@ app.get("/api/personal-analysis", (req, res) => {
         });
     });
 });
+// 获取某个学生的历次各科成绩
+app.get("/api/students/:id/subject-scores", (req, res) => {
+    const studentId = req.params.id;
+    const sql = `
+        SELECT e.exam_date, g.chinese, g.math, g.english, g.physics, g.chemistry, g.biology
+        FROM grades g
+        JOIN exams e ON g.exam_id = e.id
+        WHERE g.student_id = ?
+        ORDER BY e.exam_date ASC;
+    `;
+
+    db.all(sql, [studentId], (err, rows) => {
+        if (err) {
+            console.error("数据库查询失败:", err);
+            return res.status(500).json({ error: "服务器内部错误" });
+        }
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({ error: "未找到该学生的成绩数据" });
+        }
+        res.json(rows);
+    });
+});
+app.get("/api/search-suggestions", (req, res) => {
+    const query = req.query.query;
+    if (!query) {
+        return res.status(400).json({ error: "缺少查询参数" });
+    }
+
+    //允许学号精准匹配 & 姓名模糊匹配
+    const sql = `
+        SELECT id, name FROM students 
+        WHERE name LIKE ? OR id = ?
+        LIMIT 10
+    `;
+
+    db.all(sql, [`%${query}%`, query], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ suggestions: rows });
+    });
+});
+// 📌 查询某个学生的个人成绩分析
+app.get("/api/personal-analysis", (req, res) => {
+    const query = req.query.query;
+    if (!query) {
+        return res.status(400).json({ error: "缺少查询参数" });
+    }
+
+    // 🔎 先查询学生信息
+    const sqlStudent = `
+        SELECT id, name FROM students WHERE name LIKE ? OR id = ?
+    `;
+    db.get(sqlStudent, [`%${query}%`, query], (err, student) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!student) return res.status(404).json({ error: "未找到该学生" });
+
+        // 🔎 查询该学生的总分趋势
+        const sqlScoresTrend = `
+            SELECT e.exam_date, g.total_score 
+            FROM grades g 
+            JOIN exams e ON g.exam_id = e.id 
+            WHERE g.student_id = ? 
+            ORDER BY e.exam_date ASC
+        `;
+        db.all(sqlScoresTrend, [student.id], (err, scores) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            // 🔎 查询该学生的各科目平均成绩
+            const sqlSubjectAverages = `
+                SELECT 
+                    AVG(chinese) AS chinese, 
+                    AVG(math) AS math, 
+                    AVG(english) AS english, 
+                    AVG(physics) AS physics, 
+                    AVG(chemistry) AS chemistry, 
+                    AVG(biology) AS biology 
+                FROM grades 
+                WHERE student_id = ?
+            `;
+            db.get(sqlSubjectAverages, [student.id], (err, averages) => {
+                if (err) return res.status(500).json({ error: err.message });
+
+                // 🔎 查询该学生的历次各科成绩
+                const sqlExamScores = `
+                    SELECT e.exam_date, g.chinese, g.math, g.english, g.physics, g.chemistry, g.biology
+                    FROM grades g
+                    JOIN exams e ON g.exam_id = e.id
+                    WHERE g.student_id = ?
+                    ORDER BY e.exam_date ASC;
+                `;
+                db.all(sqlExamScores, [student.id], (err, examScores) => {
+                    if (err) return res.status(500).json({ error: err.message });
+
+                    // ✅ 返回完整数据（适合后续组件使用）
+                    res.json({
+                        studentInfo: {
+                            id: student.id,
+                            name: student.name
+                        },
+                        scoresTrend: {
+                            dates: scores.map(row => row.exam_date),
+                            scores: scores.map(row => row.total_score)
+                        },
+                        subjectAverages: averages,
+                        examScores: examScores // 新增：历次考试各科成绩
+                    });
+                });
+            });
+        });
+    });
+});
+app.get("/api/student/exam-results", (req, res) => {
+    const query = req.query.query;
+    if (!query) {
+        return res.status(400).json({ error: "缺少查询参数" });
+    }
+
+    const sqlStudent = `SELECT id, name FROM students WHERE name LIKE ? OR id = ?`;
+    db.get(sqlStudent, [`%${query}%`, query], (err, student) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!student) return res.status(404).json({ error: "未找到该学生" });
+
+        const sqlExamResults = `
+        SELECT 
+            substr(e.exam_date, 1, 4) || '-' || substr(e.exam_date, 5, 2) || '-' || substr(e.exam_date, 7, 2) AS exam_date,
+            g.chinese, g.math, g.english, g.physics, g.chemistry, g.biology,
+            (g.chinese + g.math + g.english + g.physics + g.chemistry + g.biology) AS total_score
+        FROM grades g
+        JOIN exams e ON g.exam_id = e.id
+        WHERE g.student_id = ?
+        ORDER BY e.exam_date ASC;
+      `;
+
+        db.all(sqlExamResults, [student.id], (err, examResults) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            // 🔍 查询学生各科平均成绩
+            const sqlAverages = `
+          SELECT 
+            AVG(chinese) AS chinese, 
+            AVG(math) AS math, 
+            AVG(english) AS english, 
+            AVG(physics) AS physics, 
+            AVG(chemistry) AS chemistry, 
+            AVG(biology) AS biology 
+          FROM grades 
+          WHERE student_id = ?
+        `;
+
+            db.get(sqlAverages, [student.id], (err, averages) => {
+                if (err) return res.status(500).json({ error: err.message });
+
+                res.json({
+                    studentInfo: {
+                        id: student.id,
+                        name: student.name,
+                        subjectAverages: averages // ✅ 这里是雷达图所需数据
+                    },
+                    examResults: examResults
+                });
+            });
+        });
+    });
+});
+app.get("/api/subjects/class-averages", (req, res) => {
+    const sql = `
+      SELECT 
+        AVG(chinese) AS chinese_avg,
+        AVG(math) AS math_avg,
+        AVG(english) AS english_avg,
+        AVG(physics) AS physics_avg,
+        AVG(chemistry) AS chemistry_avg,
+        AVG(biology) AS biology_avg
+      FROM grades
+    `;
+    db.get(sql, [], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(row);
+    });
+});// ✅ 修改指定学生某次考试成绩
+app.post("/api/update-grade", express.json(), (req, res) => {
+    const { name, exam_date, scores } = req.body;
+
+    if (!name || !exam_date || !scores) {
+        return res.status(400).json({ error: "参数不完整" });
+    }
+
+    // 1. 查找学生 ID
+    const findStudentSql = `SELECT id FROM students WHERE name = ?`;
+    db.get(findStudentSql, [name], (err, student) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!student) return res.status(404).json({ error: "未找到该学生" });
+
+        const studentId = student.id;
+
+        // 2. 查找考试 ID
+        const findExamSql = `SELECT id FROM exams WHERE exam_date = ?`;
+        db.get(findExamSql, [exam_date], (err, exam) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!exam) return res.status(404).json({ error: "未找到该考试" });
+
+            const examId = exam.id;
+
+            // 3. 构造更新语句
+            const updateSql = `
+                UPDATE grades
+                SET chinese = ?, math = ?, english = ?, physics = ?, chemistry = ?, biology = ?, total_score = ?
+                WHERE student_id = ? AND exam_id = ?
+            `;
+
+            const { chinese, math, english, physics, chemistry, biology } = scores;
+            const total = chinese + math + english + physics + chemistry + biology;
+
+            const values = [chinese, math, english, physics, chemistry, biology, total, studentId, examId];
+
+            db.run(updateSql, values, function (err) {
+                if (err) return res.status(500).json({ error: err.message });
+
+                if (this.changes === 0) {
+                    return res.status(404).json({ error: "未找到对应的成绩记录" });
+                }
+
+                res.json({ success: true, message: "成绩已更新" });
+            });
+        });
+    });
+});
 app.listen(3000, () => console.log("🚀 服务器运行在 http://localhost:3000"));

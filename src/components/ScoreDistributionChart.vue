@@ -1,7 +1,6 @@
 <template>
     <div class="chart-container">
       <div class="header">
-        <h2>班级分数段分布情况</h2>
       </div>
   
       <div class="chart-wrapper">

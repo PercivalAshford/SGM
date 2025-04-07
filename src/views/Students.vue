@@ -1,12 +1,13 @@
 <template>
   <div class="students-container">
-    <!-- 搜索/添加学生 -->
+    <!-- 搜索/添加/导出 -->
     <div class="add-student">
       <input 
         v-model="searchQuery" 
         @keyup.enter="handleEnter" 
-        placeholder="搜索或输入学生姓名..." />
+        placeholder="搜索姓名或学号..." />
       <button @click="addStudent">添加</button>
+      <button @click="exportToExcel" class="export-btn">导出 Excel</button>
     </div>
 
     <!-- 学生列表 -->
@@ -15,6 +16,7 @@
         <div v-for="student in filteredStudents" :key="student.id" class="student-card">
           <div class="student-info">
             <p class="student-name">{{ student.name }}</p>
+            <p class="student-id">学号：{{ student.id }}</p>
           </div>
           <div class="student-actions">
             <button @click="deleteStudent(student.id)" class="delete-btn">删除</button>
@@ -28,13 +30,14 @@
 <script>
 import { ref, computed, onMounted } from "vue";
 import axios from "axios";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 export default {
   setup() {
-    const students = ref([]); // 存储所有学生
-    const searchQuery = ref(""); // 搜索框输入
+    const students = ref([]);
+    const searchQuery = ref("");
 
-    // 获取学生列表
     const fetchStudents = async () => {
       try {
         const response = await axios.get("http://localhost:3000/api/students");
@@ -44,34 +47,32 @@ export default {
       }
     };
 
-    // 计算匹配的学生（搜索功能）
     const filteredStudents = computed(() => {
+      const query = searchQuery.value.trim().toLowerCase();
       return students.value.filter(student =>
-        student.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+        student.name.toLowerCase().includes(query) ||
+        String(student.id).includes(query)
       );
     });
 
-    // 处理搜索框输入回车
     const handleEnter = () => {
       if (filteredStudents.value.length === 0 && searchQuery.value.trim()) {
         addStudent();
       }
     };
 
-    // 添加学生
     const addStudent = async () => {
       if (!searchQuery.value.trim()) return alert("学生姓名不能为空");
 
       try {
         const response = await axios.post("http://localhost:3000/api/students", { name: searchQuery.value });
         students.value.push(response.data);
-        searchQuery.value = ""; // 清空输入框
+        searchQuery.value = "";
       } catch (error) {
         console.error("添加学生失败:", error);
       }
     };
 
-    // 删除学生
     const deleteStudent = async (id) => {
       if (!confirm("确定要删除该学生吗？")) return;
 
@@ -83,6 +84,23 @@ export default {
       }
     };
 
+    // ✅ 导出 Excel 功能
+    const exportToExcel = () => {
+      const exportData = filteredStudents.value.map(student => ({
+        学号: student.id,
+        姓名: student.name
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '学生列表');
+
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+
+      saveAs(blob, '学生列表.xlsx');
+    };
+
     onMounted(fetchStudents);
 
     return {
@@ -92,6 +110,7 @@ export default {
       addStudent,
       deleteStudent,
       handleEnter,
+      exportToExcel
     };
   }
 };
@@ -105,11 +124,12 @@ export default {
   text-align: center;
 }
 
-/* 搜索/添加学生 */
+/* 顶部操作栏 */
 .add-student {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .add-student input {
@@ -127,8 +147,6 @@ export default {
 }
 
 .add-student button {
-  background-color: #007bff;
-  color: white;
   padding: 12px 18px;
   border: none;
   border-radius: 8px;
@@ -137,15 +155,30 @@ export default {
   transition: all 0.2s;
 }
 
-.add-student button:hover {
+/* 添加按钮 */
+.add-student button:first-of-type {
+  background-color: #007bff;
+  color: white;
+}
+
+.add-student button:first-of-type:hover {
   background-color: #0056b3;
 }
 
-.add-student button:active {
+/* ✅ 导出按钮 */
+.export-btn {
+  background-color: #28a745;
+  color: white;
+}
+
+.export-btn:hover {
+  background-color: #218838;
+}
+
+.export-btn:active {
   transform: scale(0.95);
 }
 
-/* 学生列表 */
 .student-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -154,7 +187,6 @@ export default {
   justify-content: center;
 }
 
-/* 学生卡片 */
 .student-card {
   background: white;
   padding: 15px;
@@ -171,6 +203,12 @@ export default {
 .student-name {
   font-size: 18px;
   font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.student-id {
+  font-size: 14px;
+  color: #888;
   margin-bottom: 10px;
 }
 
@@ -179,7 +217,6 @@ export default {
   justify-content: center;
 }
 
-/* 默认状态，按钮颜色较浅 */
 .delete-btn {
   background-color: #0056;
   color: white;
@@ -192,15 +229,12 @@ export default {
   transition: background-color 0.2s, transform 0.2s;
 }
 
-/* 悬停时变红 */
 .delete-btn:hover {
   background-color: red;
 }
 
-/* 按下时颜色更深一些 */
 .delete-btn:active {
   background-color: #c45252;
   transform: scale(0.97);
 }
-
 </style>
